@@ -1,5 +1,6 @@
 using ApiTesting.Interfaces;
 using ApiTesting.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ApiTesting.Controllers;
@@ -9,6 +10,7 @@ namespace ApiTesting.Controllers;
 public class WeatherForecastController(IWeatherForecastManager manager) : ControllerBase
 {
     [HttpGet]
+    [AllowAnonymous]
     public IEnumerable<WeatherForecast> Get()
     {
         return manager.GetForecast();

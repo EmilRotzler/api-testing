@@ -1,4 +1,5 @@
 @ApiTesting_HostAddress = http://localhost:5095
+@ApiTesting_Token = local-dev-token
 
 GET {{ApiTesting_HostAddress}}/weatherforecast/
 Accept: application/json
@@ -6,5 +7,15 @@ Accept: application/json
 ###
 
 POST {{ApiTesting_HostAddress}}/weatherforecast/invalidate-cache
+
+###
+
+POST {{ApiTesting_HostAddress}}/weatherforecast/invalidate-cache
+Authorization: Bearer wrong-token
+
+###
+
+POST {{ApiTesting_HostAddress}}/weatherforecast/invalidate-cache
+Authorization: Bearer {{ApiTesting_Token}}
 
 ###

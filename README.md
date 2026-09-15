@@ -26,6 +26,16 @@ ApiTesting/
 cp appsettings.example.json appsettings.json
 ```
 
+## Authentication
+
+Endpoints require a bearer token by default. Set `Auth:Token` in `appsettings.json` (the app fails to start if it's missing), then send it on protected requests:
+
+```
+Authorization: Bearer <your-token>
+```
+
+Requests without a valid token receive `401 Unauthorized`. `GET /weatherforecast` is marked `[AllowAnonymous]` and does not require a token; `POST /weatherforecast/invalidate-cache` does. Mark other endpoints with `[AllowAnonymous]` (`Microsoft.AspNetCore.Authorization`) to exclude them the same way.
+
 ## Requirements
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
