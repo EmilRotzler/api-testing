@@ -4,3 +4,7 @@ GET {{ApiTesting_HostAddress}}/weatherforecast/
 Accept: application/json
 
 ###
+
+POST {{ApiTesting_HostAddress}}/weatherforecast/invalidate-cache
+
+###

@@ -13,4 +13,11 @@ public class WeatherForecastController(IWeatherForecastManager manager) : Contro
     {
         return manager.GetForecast();
     }
+
+    [HttpPost("invalidate-cache")]
+    public IActionResult InvalidateCache()
+    {
+        manager.InvalidateCache();
+        return NoContent();
+    }
 }
