@@ -70,3 +70,8 @@ nunit-*.xml
 
 # Docs
 /docs
+
+# SQLite
+*.db
+*.db-shm
+*.db-wal

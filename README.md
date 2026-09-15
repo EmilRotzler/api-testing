@@ -8,12 +8,15 @@ A minimal ASP.NET Core Web API built on .NET 10, used for exploring and testing 
 ApiTesting/
 ├── Controllers/
 │   └── WeatherForecastController.cs   # GET /weatherforecast
+├── Data/
+│   └── AppDbContext.cs                # EF Core DbContext
 ├── Interfaces/
 │   └── IWeatherForecastManager.cs     # Manager abstraction
 ├── Managers/
 │   └── WeatherForecastManager.cs      # Business logic
+├── Migrations/                        # EF Core migrations
 ├── Models/
-│   └── WeatherForecast.cs             # Response model
+│   └── WeatherForecast.cs             # Response model / EF entity
 ├── Program.cs                         # App bootstrap & DI registration
 └── ApiTesting.http                    # HTTP test file
 ```
@@ -36,6 +39,22 @@ Authorization: Bearer <your-token>
 
 Requests without a valid token receive `401 Unauthorized`. `GET /weatherforecast` is marked `[AllowAnonymous]` and does not require a token; `POST /weatherforecast/invalidate-cache` does. Mark other endpoints with `[AllowAnonymous]` (`Microsoft.AspNetCore.Authorization`) to exclude them the same way.
 
+## Database
+
+Forecast data is persisted in a local SQLite database (`app.db`, gitignored). The
+connection string lives under `ConnectionStrings:Default` in `appsettings.json`.
+
+On startup, the app automatically creates `app.db` and applies any pending EF Core
+migrations (including seeding the initial forecast rows) via `Database.Migrate()` — no
+manual setup is required to run the app.
+
+To add a new migration after changing an entity, use the `dotnet-ef` local tool
+(already restored via `dotnet tool restore`):
+
+```bash
+dotnet ef migrations add <MigrationName>
+```
+
 ## Requirements
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
@@ -54,17 +73,26 @@ The API starts on:
 
 | Method | Route              | Description                          |
 |--------|--------------------|--------------------------------------|
-| GET    | /weatherforecast   | Returns 5-day forecast with random temperatures and summaries |
+| GET    | /weatherforecast   | Returns the 5 persisted forecast rows from the database |
 
 ### Example response
 
 ```json
 [
   {
-    "date": "2026-04-11",
-    "temperatureC": 23,
-    "temperatureF": 73,
-    "summary": "Warm"
+    "date": "2026-09-16",
+    "temperatureC": 20,
+    "summary": "Mild",
+    "id": 1,
+    "location": "Oslo",
+    "latitude": 59.9139,
+    "longitude": 10.7522,
+    "windSpeedKmh": 12,
+    "windDirectionDegrees": 270,
+    "humidityPercent": 60,
+    "precipitationChancePercent": 20,
+    "temperatureF": 67,
+    "feelsLikeC": 20
   }
 ]
 ```
