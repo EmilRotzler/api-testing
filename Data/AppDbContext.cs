@@ -7,6 +7,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 {
     public DbSet<WeatherForecast> WeatherForecasts => Set<WeatherForecast>();
 
+    public DbSet<User> Users => Set<User>();
+
+    public DbSet<AuthToken> AuthTokens => Set<AuthToken>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<WeatherForecast>(entity =>
@@ -72,6 +76,35 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                     PrecipitationChancePercent = 5,
                 }
             );
+        });
+
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.HasKey(u => u.Id);
+            entity.HasIndex(u => u.Username).IsUnique();
+            entity.HasIndex(u => u.Email).IsUnique();
+
+            entity.HasData(new User
+            {
+                Id = 1,
+                Username = "admin",
+                Email = "admin@example.com",
+                FirstName = "Admin",
+                LastName = "User",
+                PasswordHash = "zVX425OzpyPcasd3oSsCCA==:FjWNWFf7HhMaucTg5sK3rV56qw9udvVeqvKPM4tssyA=",
+                Role = "Admin",
+                IsActive = true,
+                CreatedAt = new DateTime(2026, 9, 15, 0, 0, 0, DateTimeKind.Utc),
+                UpdatedAt = new DateTime(2026, 9, 15, 0, 0, 0, DateTimeKind.Utc),
+                LastLoginAt = null,
+            });
+        });
+
+        modelBuilder.Entity<AuthToken>(entity =>
+        {
+            entity.HasKey(t => t.Id);
+            entity.HasIndex(t => t.Token).IsUnique();
+            entity.HasOne<User>().WithMany().HasForeignKey(t => t.UserId);
         });
     }
 }

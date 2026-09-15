@@ -13,6 +13,8 @@ builder.Services.AddOpenApi();
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<ICacheService, MemoryCacheService>();
 builder.Services.AddScoped<IWeatherForecastManager, WeatherForecastManager>();
+builder.Services.AddSingleton<IPasswordHasher, Argon2PasswordHasher>();
+builder.Services.AddScoped<IAuthManager, AuthManager>();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("Default")));
@@ -20,13 +22,6 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddTransient<TokenAuthMiddleware>();
 
 var app = builder.Build();
-
-var authToken = app.Configuration["Auth:Token"];
-if (string.IsNullOrEmpty(authToken))
-{
-    throw new InvalidOperationException(
-        "Auth:Token is not configured. Set it in appsettings.json before starting the app.");
-}
 
 using (var scope = app.Services.CreateScope())
 {
