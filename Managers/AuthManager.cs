@@ -2,19 +2,37 @@ using System.Security.Cryptography;
 using ApiTesting.Data;
 using ApiTesting.Dtos;
 using ApiTesting.Interfaces;
+using ApiTesting.Logging;
 using ApiTesting.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace ApiTesting.Managers;
 
-public class AuthManager(AppDbContext dbContext, IPasswordHasher passwordHasher, IConfiguration configuration)
+public class AuthManager(
+    AppDbContext dbContext,
+    IPasswordHasher passwordHasher,
+    IConfiguration configuration,
+    ILogger<AuthManager> logger)
     : IAuthManager
 {
     public async Task<LoginResult?> LoginAsync(string username, string password)
     {
         var user = await dbContext.Users.SingleOrDefaultAsync(u => u.Username == username);
-        if (user is null || !user.IsActive || !passwordHasher.VerifyPassword(user.PasswordHash, password))
+        if (user is null)
         {
+            logger.LoginFailedUnknownUser(username);
+            return null;
+        }
+
+        if (!user.IsActive)
+        {
+            logger.LoginFailedInactiveUser(username, user.Id);
+            return null;
+        }
+
+        if (!passwordHasher.VerifyPassword(user.PasswordHash, password))
+        {
+            logger.LoginFailedInvalidPassword(username, user.Id);
             return null;
         }
 
@@ -35,13 +53,26 @@ public class AuthManager(AppDbContext dbContext, IPasswordHasher passwordHasher,
 
         await dbContext.SaveChangesAsync();
 
+        logger.LoginSucceeded(user.Id, expiresAt);
         return new LoginResult(token, expiresAt);
     }
 
     public async Task<bool> ValidateTokenAsync(string token)
     {
         var authToken = await dbContext.AuthTokens.SingleOrDefaultAsync(t => t.Token == token);
-        return authToken is not null && authToken.ExpiresAt > DateTime.UtcNow;
+        if (authToken is null)
+        {
+            logger.TokenNotFound();
+            return false;
+        }
+
+        if (authToken.ExpiresAt <= DateTime.UtcNow)
+        {
+            logger.TokenExpired(authToken.UserId, authToken.ExpiresAt);
+            return false;
+        }
+
+        return true;
     }
 
     private static string GenerateToken()

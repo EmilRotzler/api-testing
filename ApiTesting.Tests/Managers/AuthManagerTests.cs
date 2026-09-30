@@ -1,10 +1,13 @@
 using ApiTesting.Data;
 using ApiTesting.Interfaces;
+using ApiTesting.Logging;
 using ApiTesting.Managers;
 using ApiTesting.Models;
 using ApiTesting.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Testing;
 using Xunit;
 
 namespace ApiTesting.Tests.Managers;
@@ -53,12 +56,19 @@ public class AuthManagerTests
         dbContext.Users.Add(CreateUser(hasher, "s3cret!"));
         await dbContext.SaveChangesAsync();
 
-        var manager = new AuthManager(dbContext, hasher, CreateConfiguration());
+        var logger = new FakeLogger<AuthManager>();
+        var manager = new AuthManager(dbContext, hasher, CreateConfiguration(), logger);
         var result = await manager.LoginAsync("testuser", "s3cret!");
 
         Assert.NotNull(result);
         Assert.False(string.IsNullOrWhiteSpace(result!.Token));
         Assert.True(result.ExpiresAt > DateTime.UtcNow);
+
+        var log = Assert.Single(logger.Collector.GetSnapshot());
+        Assert.Equal(LogLevel.Information, log.Level);
+        Assert.Equal(LogEventIds.AuthManager.LoginSucceeded, log.Id.Id);
+        Assert.DoesNotContain(result.Token, log.Message);
+        Assert.DoesNotContain("s3cret!", log.Message);
     }
 
     [Fact]
@@ -69,7 +79,7 @@ public class AuthManagerTests
         dbContext.Users.Add(CreateUser(hasher, "s3cret!"));
         await dbContext.SaveChangesAsync();
 
-        var manager = new AuthManager(dbContext, hasher, CreateConfiguration());
+        var manager = new AuthManager(dbContext, hasher, CreateConfiguration(), new FakeLogger<AuthManager>());
         await manager.LoginAsync("testuser", "s3cret!");
 
         var updated = await dbContext.Users.SingleAsync(u => u.Username == "testuser");
@@ -84,10 +94,16 @@ public class AuthManagerTests
         dbContext.Users.Add(CreateUser(hasher, "s3cret!"));
         await dbContext.SaveChangesAsync();
 
-        var manager = new AuthManager(dbContext, hasher, CreateConfiguration());
+        var logger = new FakeLogger<AuthManager>();
+        var manager = new AuthManager(dbContext, hasher, CreateConfiguration(), logger);
         var result = await manager.LoginAsync("testuser", "wrong-password");
 
         Assert.Null(result);
+
+        var log = Assert.Single(logger.Collector.GetSnapshot());
+        Assert.Equal(LogLevel.Warning, log.Level);
+        Assert.Equal(LogEventIds.AuthManager.LoginFailedInvalidPassword, log.Id.Id);
+        Assert.DoesNotContain("wrong-password", log.Message);
     }
 
     [Fact]
@@ -98,21 +114,33 @@ public class AuthManagerTests
         dbContext.Users.Add(CreateUser(hasher, "s3cret!", isActive: false));
         await dbContext.SaveChangesAsync();
 
-        var manager = new AuthManager(dbContext, hasher, CreateConfiguration());
+        var logger = new FakeLogger<AuthManager>();
+        var manager = new AuthManager(dbContext, hasher, CreateConfiguration(), logger);
         var result = await manager.LoginAsync("testuser", "s3cret!");
 
         Assert.Null(result);
+
+        var log = Assert.Single(logger.Collector.GetSnapshot());
+        Assert.Equal(LogLevel.Warning, log.Level);
+        Assert.Equal(LogEventIds.AuthManager.LoginFailedInactiveUser, log.Id.Id);
     }
 
     [Fact]
     public async Task LoginAsync_ReturnsNullForUnknownUsername()
     {
         await using var dbContext = CreateDbContext();
-        var manager = new AuthManager(dbContext, new Argon2PasswordHasher(), CreateConfiguration());
+        var logger = new FakeLogger<AuthManager>();
+        var manager = new AuthManager(dbContext, new Argon2PasswordHasher(), CreateConfiguration(), logger);
 
         var result = await manager.LoginAsync("nobody", "whatever");
 
         Assert.Null(result);
+
+        var log = Assert.Single(logger.Collector.GetSnapshot());
+        Assert.Equal(LogLevel.Warning, log.Level);
+        Assert.Equal(LogEventIds.AuthManager.LoginFailedUnknownUser, log.Id.Id);
+        Assert.Contains("nobody", log.Message);
+        Assert.DoesNotContain("whatever", log.Message);
     }
 
     [Fact]
@@ -123,7 +151,7 @@ public class AuthManagerTests
         dbContext.Users.Add(CreateUser(hasher, "s3cret!"));
         await dbContext.SaveChangesAsync();
 
-        var manager = new AuthManager(dbContext, hasher, CreateConfiguration());
+        var manager = new AuthManager(dbContext, hasher, CreateConfiguration(), new FakeLogger<AuthManager>());
         var loginResult = await manager.LoginAsync("testuser", "s3cret!");
 
         var isValid = await manager.ValidateTokenAsync(loginResult!.Token);
@@ -135,11 +163,17 @@ public class AuthManagerTests
     public async Task ValidateTokenAsync_ReturnsFalseForUnknownToken()
     {
         await using var dbContext = CreateDbContext();
-        var manager = new AuthManager(dbContext, new Argon2PasswordHasher(), CreateConfiguration());
+        var logger = new FakeLogger<AuthManager>();
+        var manager = new AuthManager(dbContext, new Argon2PasswordHasher(), CreateConfiguration(), logger);
 
         var isValid = await manager.ValidateTokenAsync("not-a-real-token");
 
         Assert.False(isValid);
+
+        var log = Assert.Single(logger.Collector.GetSnapshot());
+        Assert.Equal(LogLevel.Warning, log.Level);
+        Assert.Equal(LogEventIds.AuthManager.TokenNotFound, log.Id.Id);
+        Assert.DoesNotContain("not-a-real-token", log.Message);
     }
 
     [Fact]
@@ -160,9 +194,15 @@ public class AuthManagerTests
         });
         await dbContext.SaveChangesAsync();
 
-        var manager = new AuthManager(dbContext, hasher, CreateConfiguration());
+        var logger = new FakeLogger<AuthManager>();
+        var manager = new AuthManager(dbContext, hasher, CreateConfiguration(), logger);
         var isValid = await manager.ValidateTokenAsync("expired-token");
 
         Assert.False(isValid);
+
+        var log = Assert.Single(logger.Collector.GetSnapshot());
+        Assert.Equal(LogLevel.Information, log.Level);
+        Assert.Equal(LogEventIds.AuthManager.TokenExpired, log.Id.Id);
+        Assert.DoesNotContain("expired-token", log.Message);
     }
 }

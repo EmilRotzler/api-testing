@@ -1,6 +1,7 @@
 using ApiTesting.Constants;
 using ApiTesting.Dtos;
 using ApiTesting.Interfaces;
+using ApiTesting.Logging;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -9,17 +10,19 @@ namespace ApiTesting.Controllers;
 
 [ApiController]
 [Route("auth")]
-public class AuthController(IAuthManager authManager) : ControllerBase
+public class AuthController(IAuthManager authManager, ILogger<AuthController> logger) : ControllerBase
 {
     [HttpPost("login")]
     [AllowAnonymous]
     [EnableRateLimiting("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
         var result = await authManager.LoginAsync(request.Username, request.Password);
 
         if (result is null)
         {
+            logger.LoginRequestRejected(request.Username, ipAddress);
             return Unauthorized(new { error = "Invalid username or password" });
         }
 
@@ -31,6 +34,7 @@ public class AuthController(IAuthManager authManager) : ControllerBase
             Expires = new DateTimeOffset(result.ExpiresAt, TimeSpan.Zero),
         });
 
+        logger.LoginRequestSucceeded(request.Username, ipAddress);
         return Ok(new LoginResponse(result.ExpiresAt));
     }
 }

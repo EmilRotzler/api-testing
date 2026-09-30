@@ -1,7 +1,10 @@
 using ApiTesting.Controllers;
 using ApiTesting.Interfaces;
+using ApiTesting.Logging;
 using ApiTesting.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Testing;
 using Xunit;
 
 namespace ApiTesting.Tests.Controllers;
@@ -27,7 +30,7 @@ public class WeatherForecastControllerTests
             new WeatherForecast(new DateOnly(2026, 9, 30), 20, "Mild"),
         };
         var manager = new FakeWeatherForecastManager { Forecasts = expected };
-        var controller = new WeatherForecastController(manager);
+        var controller = new WeatherForecastController(manager, new FakeLogger<WeatherForecastController>());
 
         var result = controller.Get();
 
@@ -38,18 +41,23 @@ public class WeatherForecastControllerTests
     public void InvalidateCache_CallsManagerInvalidateCache()
     {
         var manager = new FakeWeatherForecastManager();
-        var controller = new WeatherForecastController(manager);
+        var logger = new FakeLogger<WeatherForecastController>();
+        var controller = new WeatherForecastController(manager, logger);
 
         controller.InvalidateCache();
 
         Assert.Equal(1, manager.InvalidateCacheCallCount);
+
+        var log = Assert.Single(logger.Collector.GetSnapshot());
+        Assert.Equal(LogLevel.Information, log.Level);
+        Assert.Equal(LogEventIds.WeatherForecastController.ForecastCacheInvalidated, log.Id.Id);
     }
 
     [Fact]
     public void InvalidateCache_ReturnsNoContent()
     {
         var manager = new FakeWeatherForecastManager();
-        var controller = new WeatherForecastController(manager);
+        var controller = new WeatherForecastController(manager, new FakeLogger<WeatherForecastController>());
 
         var result = controller.InvalidateCache();
 

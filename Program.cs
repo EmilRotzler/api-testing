@@ -8,6 +8,11 @@ using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Console only, so the app runs locally with no external log service. Format and levels come from
+// the "Logging" section of appsettings: readable single-line output in Development, JSON elsewhere.
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
@@ -56,6 +61,7 @@ builder.Services.AddRateLimiter(options =>
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("Default")));
 
+builder.Services.AddTransient<ExceptionHandlingMiddleware>();
 builder.Services.AddTransient<TokenAuthMiddleware>();
 
 var app = builder.Build();
@@ -65,6 +71,9 @@ using (var scope = app.Services.CreateScope())
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     dbContext.Database.Migrate();
 }
+
+// First in the pipeline so it catches exceptions from everything registered after it.
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {

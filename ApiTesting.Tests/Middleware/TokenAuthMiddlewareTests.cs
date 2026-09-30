@@ -1,9 +1,12 @@
 using ApiTesting.Constants;
 using ApiTesting.Dtos;
 using ApiTesting.Interfaces;
+using ApiTesting.Logging;
 using ApiTesting.Middleware;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Testing;
 using Xunit;
 
 namespace ApiTesting.Tests.Middleware;
@@ -40,7 +43,7 @@ public class TokenAuthMiddlewareTests
     [Fact]
     public async Task InvokeAsync_CallsNextForAllowAnonymousEndpoint()
     {
-        var middleware = new TokenAuthMiddleware(new FakeAuthManager());
+        var middleware = new TokenAuthMiddleware(new FakeAuthManager(), new FakeLogger<TokenAuthMiddleware>());
         var context = CreateContext(allowAnonymous: true);
         var nextCalled = false;
 
@@ -57,8 +60,11 @@ public class TokenAuthMiddlewareTests
     [Fact]
     public async Task InvokeAsync_ReturnsUnauthorizedWhenCookieMissing()
     {
-        var middleware = new TokenAuthMiddleware(new FakeAuthManager());
+        var logger = new FakeLogger<TokenAuthMiddleware>();
+        var middleware = new TokenAuthMiddleware(new FakeAuthManager(), logger);
         var context = CreateContext(allowAnonymous: false);
+        context.Request.Method = "POST";
+        context.Request.Path = "/weatherforecast/invalidate-cache";
         var nextCalled = false;
 
         await middleware.InvokeAsync(context, _ =>
@@ -69,13 +75,19 @@ public class TokenAuthMiddlewareTests
 
         Assert.False(nextCalled);
         Assert.Equal(StatusCodes.Status401Unauthorized, context.Response.StatusCode);
+
+        var log = Assert.Single(logger.Collector.GetSnapshot());
+        Assert.Equal(LogLevel.Information, log.Level);
+        Assert.Equal(LogEventIds.TokenAuthMiddleware.RequestRejectedMissingToken, log.Id.Id);
+        Assert.Contains("/weatherforecast/invalidate-cache", log.Message);
     }
 
     [Fact]
     public async Task InvokeAsync_ReturnsUnauthorizedWhenTokenInvalid()
     {
         var authManager = new FakeAuthManager { TokenIsValid = false };
-        var middleware = new TokenAuthMiddleware(authManager);
+        var logger = new FakeLogger<TokenAuthMiddleware>();
+        var middleware = new TokenAuthMiddleware(authManager, logger);
         var context = CreateContext(allowAnonymous: false, cookieToken: "bad-token");
         var nextCalled = false;
 
@@ -87,13 +99,19 @@ public class TokenAuthMiddlewareTests
 
         Assert.False(nextCalled);
         Assert.Equal(StatusCodes.Status401Unauthorized, context.Response.StatusCode);
+
+        var log = Assert.Single(logger.Collector.GetSnapshot());
+        Assert.Equal(LogLevel.Warning, log.Level);
+        Assert.Equal(LogEventIds.TokenAuthMiddleware.RequestRejectedInvalidToken, log.Id.Id);
+        Assert.DoesNotContain("bad-token", log.Message);
     }
 
     [Fact]
     public async Task InvokeAsync_CallsNextWhenTokenValid()
     {
         var authManager = new FakeAuthManager { TokenIsValid = true };
-        var middleware = new TokenAuthMiddleware(authManager);
+        var logger = new FakeLogger<TokenAuthMiddleware>();
+        var middleware = new TokenAuthMiddleware(authManager, logger);
         var context = CreateContext(allowAnonymous: false, cookieToken: "good-token");
         var nextCalled = false;
 
@@ -105,5 +123,6 @@ public class TokenAuthMiddlewareTests
 
         Assert.True(nextCalled);
         Assert.Equal(StatusCodes.Status200OK, context.Response.StatusCode);
+        Assert.Empty(logger.Collector.GetSnapshot());
     }
 }

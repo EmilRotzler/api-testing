@@ -1,10 +1,11 @@
 using ApiTesting.Constants;
 using ApiTesting.Interfaces;
+using ApiTesting.Logging;
 using Microsoft.AspNetCore.Authorization;
 
 namespace ApiTesting.Middleware;
 
-public class TokenAuthMiddleware(IAuthManager authManager) : IMiddleware
+public class TokenAuthMiddleware(IAuthManager authManager, ILogger<TokenAuthMiddleware> logger) : IMiddleware
 {
     public async Task InvokeAsync(HttpContext context, RequestDelegate next)
     {
@@ -14,9 +15,18 @@ public class TokenAuthMiddleware(IAuthManager authManager) : IMiddleware
             return;
         }
 
-        if (!context.Request.Cookies.TryGetValue(AuthConstants.TokenCookieName, out var token) ||
-            !await authManager.ValidateTokenAsync(token))
+        var ipAddress = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+        if (!context.Request.Cookies.TryGetValue(AuthConstants.TokenCookieName, out var token))
         {
+            logger.RequestRejectedMissingToken(context.Request.Method, context.Request.Path, ipAddress);
+            await WriteUnauthorized(context);
+            return;
+        }
+
+        if (!await authManager.ValidateTokenAsync(token))
+        {
+            logger.RequestRejectedInvalidToken(context.Request.Method, context.Request.Path, ipAddress);
             await WriteUnauthorized(context);
             return;
         }
