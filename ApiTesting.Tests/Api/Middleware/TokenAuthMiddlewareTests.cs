@@ -3,6 +3,7 @@ using ApiTesting.Api.Middleware;
 using ApiTesting.Common.Constants;
 using ApiTesting.Common.Logging;
 using ApiTesting.Core.Interfaces;
+using ApiTesting.Core.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
@@ -21,6 +22,8 @@ public class TokenAuthMiddlewareTests
             throw new NotImplementedException();
 
         public Task<bool> ValidateTokenAsync(string token) => Task.FromResult(TokenIsValid);
+
+        public Task<User?> GetUserByTokenAsync(string token) => throw new NotImplementedException();
     }
 
     private static DefaultHttpContext CreateContext(bool allowAnonymous, string? cookieToken = null)

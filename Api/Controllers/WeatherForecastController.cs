@@ -1,3 +1,4 @@
+using ApiTesting.Api.Dtos;
 using ApiTesting.Common.Logging;
 using ApiTesting.Core.Interfaces;
 using ApiTesting.Core.Models;
@@ -25,5 +26,13 @@ public class WeatherForecastController(IWeatherForecastManager manager, ILogger<
         manager.InvalidateCache();
         logger.ForecastCacheInvalidated();
         return NoContent();
+    }
+
+    [HttpPost("email-report")]
+    public IActionResult EmailReport()
+    {
+        var jobId = manager.QueueEmailReport();
+        logger.EmailReportQueued(jobId);
+        return Accepted(new EmailReportQueuedResponse(jobId));
     }
 }

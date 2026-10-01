@@ -25,6 +25,8 @@ A small ASP.NET Core Web API built on .NET 10 for exploring and testing REST API
 cp appsettings.example.json appsettings.json
 ```
 
+If you already have an `appsettings.json`, copy the `ConnectionStrings:Hangfire` and `Email` entries from the example into it.
+
 ### Running the API
 
 ```bash
@@ -60,9 +62,12 @@ To make basic testing possible out of the box, the database is created with one 
 
 ## Endpoints
 
-| Method | Route              | Description                          |
-|--------|--------------------|--------------------------------------|
-| GET    | /weatherforecast   | Returns the 5 persisted forecast rows from the database |
+| Method | Route                              | Auth          | Description |
+|--------|------------------------------------|---------------|-------------|
+| GET    | /weatherforecast                   | Anonymous     | Returns the 5 persisted forecast rows from the database |
+| POST   | /weatherforecast/invalidate-cache  | Authenticated | Clears the 30s forecast cache |
+| POST   | /weatherforecast/email-report      | Authenticated | Queues a background job that emails a PDF of the forecasts; returns `202` with `{ "jobId": "..." }` |
+| GET    | /hangfire                          | Admin role    | Hangfire background-job dashboard |
 
 ### Example response
 
@@ -85,6 +90,40 @@ To make basic testing possible out of the box, the database is created with one 
   }
 ]
 ```
+
+## Email reports
+
+`POST /weatherforecast/email-report` enqueues a [Hangfire](https://www.hangfire.io/) job and returns immediately. The job reads the current forecasts from the database, renders a one-page PDF with [QuestPDF](https://www.questpdf.com/) (Community license) and emails it via SMTP ([MailKit](https://github.com/jstedfast/MailKit)) to the address in `Email:ReportRecipient`.
+
+Jobs are stored in a separate SQLite file (`ConnectionStrings:Hangfire`, default `hangfire.db`), so queued jobs survive restarts. Hangfire polls for new jobs, so expect a delay of up to ~15 seconds before a job runs. Failed jobs are retried up to 3 times and then appear under *Failed* in the dashboard, where they can be requeued.
+
+### Configuration
+
+| Key | Description |
+|-----|-------------|
+| `Email:From` | Sender address |
+| `Email:ReportRecipient` | Where reports are sent |
+| `Email:Smtp:Host` / `Port` | SMTP server (default `localhost:1025`) |
+| `Email:Smtp:UseSsl` | `true` to negotiate SSL/STARTTLS; `false` for local catchers |
+| `Email:Smtp:Username` / `Password` | Optional; authentication is skipped when `Username` is empty |
+
+Invalid email settings stop the app at startup.
+
+### Testing email locally
+
+No Docker needed. [smtp4dev](https://github.com/rnwood/smtp4dev) is installed as a local tool by `dotnet tool restore`:
+
+```bash
+dotnet smtp4dev --smtpport=1025 --urls=http://localhost:5000
+```
+
+Trigger a report, then view the received email and PDF at `http://localhost:5000`.
+
+Prefer Docker? [Mailpit](https://mailpit.axllent.org/) works the same way: `docker run -p 8025:8025 -p 1025:1025 axllent/mailpit` (UI at `http://localhost:8025`).
+
+### Dashboard
+
+`/hangfire` requires a logged-in user with the `Admin` role (the seeded `admin` user qualifies). Open `http://localhost:5095/hangfire`: if you aren't logged in as an admin you get a minimal login page (`wwwroot/hangfire/login.html`) at the same URL, and after logging in it shows the dashboard. Other dashboard URLs return `401` until you're logged in.
 
 ## OpenAPI / Swagger
 
@@ -137,16 +176,19 @@ ApiTesting/
 ├── Api/                   # HTTP layer
 │   ├── Controllers/       # API endpoints (auth, weather forecast)
 │   ├── Dtos/              # Request/response types
+│   ├── Filters/           # Hangfire dashboard authorization
 │   └── Middleware/        # Exception handling, token auth
 ├── Core/                  # Business logic & domain
 │   ├── Interfaces/        # Manager and service abstractions
+│   ├── Jobs/              # Hangfire background jobs
 │   ├── Managers/          # Business logic
 │   └── Models/            # Domain / EF entities
 ├── Infrastructure/        # External concerns
 │   ├── Data/              # EF Core DbContext
 │   ├── Migrations/        # EF Core migrations
-│   └── Services/          # Password hashing, caching
+│   └── Services/          # Password hashing, caching, PDF, SMTP
 ├── Common/                # Cross-cutting
+│   ├── Configuration/     # Strongly typed options
 │   ├── Constants/         # Shared constants
 │   └── Logging/           # Log messages and event IDs
 ├── ApiTesting.Tests/      # Test project (mirrors the layout above)

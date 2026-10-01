@@ -5,10 +5,13 @@ namespace ApiTesting.Common.Logging;
 //     1100-1199  AuthController
 //     1200-1299  AuthManager
 //     1300-1399  TokenAuthMiddleware
+//     1400-1499  AdminDashboardAuthorizationFilter
 //   2000-2999  Weather forecasts
 //     2100-2199  WeatherForecastController
+//     2200-2299  WeatherReportJob
 //   9000-9999  Infrastructure
 //     9100-9199  ExceptionHandlingMiddleware
+//     9200-9299  SmtpEmailSender
 public static class LogEventIds
 {
     public static class ExceptionHandlingMiddleware
@@ -32,6 +35,7 @@ public static class LogEventIds
         public const int LoginFailedInvalidPassword = 1203;
         public const int TokenNotFound = 1210;
         public const int TokenExpired = 1211;
+        public const int TokenUserInactive = 1212;
     }
 
     public static class TokenAuthMiddleware
@@ -44,5 +48,23 @@ public static class LogEventIds
     {
         public const int ForecastRequested = 2100;
         public const int ForecastCacheInvalidated = 2101;
+        public const int EmailReportQueued = 2102;
+    }
+
+    public static class AdminDashboardAuthorizationFilter
+    {
+        public const int DashboardAccessDenied = 1400;
+    }
+
+    public static class WeatherReportJob
+    {
+        public const int ReportJobStarted = 2200;
+        public const int ReportSent = 2201;
+    }
+
+    public static class SmtpEmailSender
+    {
+        public const int EmailSent = 9200;
+        public const int EmailSendFailed = 9201;
     }
 }

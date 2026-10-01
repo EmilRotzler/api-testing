@@ -205,4 +205,93 @@ public class AuthManagerTests
         Assert.Equal(LogEventIds.AuthManager.TokenExpired, log.Id.Id);
         Assert.DoesNotContain("expired-token", log.Message);
     }
+
+    [Fact]
+    public async Task GetUserByTokenAsync_ReturnsUserForValidToken()
+    {
+        await using var dbContext = CreateDbContext();
+        var hasher = new Argon2PasswordHasher();
+        var user = CreateUser(hasher, "s3cret!");
+        dbContext.Users.Add(user);
+        await dbContext.SaveChangesAsync();
+
+        var manager = new AuthManager(dbContext, hasher, CreateConfiguration(), new FakeLogger<AuthManager>());
+        var loginResult = await manager.LoginAsync("testuser", "s3cret!");
+
+        var result = await manager.GetUserByTokenAsync(loginResult!.Token);
+
+        Assert.NotNull(result);
+        Assert.Equal(user.Id, result!.Id);
+    }
+
+    [Fact]
+    public async Task GetUserByTokenAsync_ReturnsNullForUnknownToken()
+    {
+        await using var dbContext = CreateDbContext();
+        var logger = new FakeLogger<AuthManager>();
+        var manager = new AuthManager(dbContext, new Argon2PasswordHasher(), CreateConfiguration(), logger);
+
+        var result = await manager.GetUserByTokenAsync("not-a-real-token");
+
+        Assert.Null(result);
+
+        var log = Assert.Single(logger.Collector.GetSnapshot());
+        Assert.Equal(LogEventIds.AuthManager.TokenNotFound, log.Id.Id);
+        Assert.DoesNotContain("not-a-real-token", log.Message);
+    }
+
+    [Fact]
+    public async Task GetUserByTokenAsync_ReturnsNullForExpiredToken()
+    {
+        await using var dbContext = CreateDbContext();
+        var hasher = new Argon2PasswordHasher();
+        var user = CreateUser(hasher, "s3cret!");
+        dbContext.Users.Add(user);
+        await dbContext.SaveChangesAsync();
+
+        dbContext.AuthTokens.Add(new AuthToken
+        {
+            Token = "expired-token",
+            UserId = user.Id,
+            CreatedAt = DateTime.UtcNow.AddHours(-25),
+            ExpiresAt = DateTime.UtcNow.AddHours(-1),
+        });
+        await dbContext.SaveChangesAsync();
+
+        var logger = new FakeLogger<AuthManager>();
+        var manager = new AuthManager(dbContext, hasher, CreateConfiguration(), logger);
+
+        var result = await manager.GetUserByTokenAsync("expired-token");
+
+        Assert.Null(result);
+
+        var log = Assert.Single(logger.Collector.GetSnapshot());
+        Assert.Equal(LogEventIds.AuthManager.TokenExpired, log.Id.Id);
+    }
+
+    [Fact]
+    public async Task GetUserByTokenAsync_ReturnsNullForInactiveUser()
+    {
+        await using var dbContext = CreateDbContext();
+        var hasher = new Argon2PasswordHasher();
+        var user = CreateUser(hasher, "s3cret!");
+        dbContext.Users.Add(user);
+        await dbContext.SaveChangesAsync();
+
+        var logger = new FakeLogger<AuthManager>();
+        var manager = new AuthManager(dbContext, hasher, CreateConfiguration(), logger);
+        var loginResult = await manager.LoginAsync("testuser", "s3cret!");
+
+        user.IsActive = false;
+        await dbContext.SaveChangesAsync();
+
+        var result = await manager.GetUserByTokenAsync(loginResult!.Token);
+
+        Assert.Null(result);
+
+        var log = logger.Collector.LatestRecord;
+        Assert.Equal(LogLevel.Information, log.Level);
+        Assert.Equal(LogEventIds.AuthManager.TokenUserInactive, log.Id.Id);
+        Assert.DoesNotContain(loginResult.Token, log.Message);
+    }
 }

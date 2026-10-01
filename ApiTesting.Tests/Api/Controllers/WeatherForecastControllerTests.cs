@@ -1,4 +1,5 @@
 using ApiTesting.Api.Controllers;
+using ApiTesting.Api.Dtos;
 using ApiTesting.Common.Logging;
 using ApiTesting.Core.Interfaces;
 using ApiTesting.Core.Models;
@@ -20,6 +21,16 @@ public class WeatherForecastControllerTests
         public IEnumerable<WeatherForecast> GetForecast() => Forecasts;
 
         public void InvalidateCache() => InvalidateCacheCallCount++;
+
+        public string JobIdToReturn { get; set; } = "job-1";
+
+        public int QueueEmailReportCallCount { get; private set; }
+
+        public string QueueEmailReport()
+        {
+            QueueEmailReportCallCount++;
+            return JobIdToReturn;
+        }
     }
 
     [Fact]
@@ -62,5 +73,25 @@ public class WeatherForecastControllerTests
         var result = controller.InvalidateCache();
 
         Assert.IsType<NoContentResult>(result);
+    }
+
+    [Fact]
+    public void EmailReport_QueuesReportAndReturnsAcceptedWithJobId()
+    {
+        var manager = new FakeWeatherForecastManager { JobIdToReturn = "job-42" };
+        var logger = new FakeLogger<WeatherForecastController>();
+        var controller = new WeatherForecastController(manager, logger);
+
+        var result = controller.EmailReport();
+
+        Assert.Equal(1, manager.QueueEmailReportCallCount);
+        var accepted = Assert.IsType<AcceptedResult>(result);
+        var body = Assert.IsType<EmailReportQueuedResponse>(accepted.Value);
+        Assert.Equal("job-42", body.JobId);
+
+        var log = Assert.Single(logger.Collector.GetSnapshot());
+        Assert.Equal(LogLevel.Information, log.Level);
+        Assert.Equal(LogEventIds.WeatherForecastController.EmailReportQueued, log.Id.Id);
+        Assert.Contains("job-42", log.Message);
     }
 }

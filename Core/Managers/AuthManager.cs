@@ -59,20 +59,43 @@ public class AuthManager(
 
     public async Task<bool> ValidateTokenAsync(string token)
     {
+        return await FindValidTokenAsync(token) is not null;
+    }
+
+    public async Task<User?> GetUserByTokenAsync(string token)
+    {
+        var authToken = await FindValidTokenAsync(token);
+        if (authToken is null)
+        {
+            return null;
+        }
+
+        var user = await dbContext.Users.FindAsync(authToken.UserId);
+        if (user is null || !user.IsActive)
+        {
+            logger.TokenUserInactive(authToken.UserId);
+            return null;
+        }
+
+        return user;
+    }
+
+    private async Task<AuthToken?> FindValidTokenAsync(string token)
+    {
         var authToken = await dbContext.AuthTokens.SingleOrDefaultAsync(t => t.Token == token);
         if (authToken is null)
         {
             logger.TokenNotFound();
-            return false;
+            return null;
         }
 
         if (authToken.ExpiresAt <= DateTime.UtcNow)
         {
             logger.TokenExpired(authToken.UserId, authToken.ExpiresAt);
-            return false;
+            return null;
         }
 
-        return true;
+        return authToken;
     }
 
     private static string GenerateToken()

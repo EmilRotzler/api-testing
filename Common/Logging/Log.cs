@@ -39,6 +39,10 @@ internal static partial class Log
         Message = "Token validation failed: token for user {UserId} expired at {ExpiresAt:O}")]
     public static partial void TokenExpired(this ILogger logger, int userId, DateTime expiresAt);
 
+    [LoggerMessage(EventId = LogEventIds.AuthManager.TokenUserInactive, Level = LogLevel.Information,
+        Message = "Token lookup failed: user {UserId} is inactive or missing")]
+    public static partial void TokenUserInactive(this ILogger logger, int userId);
+
     // TokenAuthMiddleware
     [LoggerMessage(EventId = LogEventIds.TokenAuthMiddleware.RequestRejectedMissingToken, Level = LogLevel.Information,
         Message = "Rejected {Method} {Path} from {IpAddress}: no auth token")]
@@ -47,6 +51,11 @@ internal static partial class Log
     [LoggerMessage(EventId = LogEventIds.TokenAuthMiddleware.RequestRejectedInvalidToken, Level = LogLevel.Warning,
         Message = "Rejected {Method} {Path} from {IpAddress}: invalid or expired auth token")]
     public static partial void RequestRejectedInvalidToken(this ILogger logger, string method, string path, string ipAddress);
+
+    // AdminDashboardAuthorizationFilter
+    [LoggerMessage(EventId = LogEventIds.AdminDashboardAuthorizationFilter.DashboardAccessDenied, Level = LogLevel.Warning,
+        Message = "Hangfire dashboard access denied: {Reason}")]
+    public static partial void DashboardAccessDenied(this ILogger logger, string reason);
 
     // ExceptionHandlingMiddleware
     [LoggerMessage(EventId = LogEventIds.ExceptionHandlingMiddleware.UnhandledException, Level = LogLevel.Error,
@@ -69,4 +78,26 @@ internal static partial class Log
     [LoggerMessage(EventId = LogEventIds.WeatherForecastController.ForecastCacheInvalidated, Level = LogLevel.Information,
         Message = "Weather forecast cache invalidated")]
     public static partial void ForecastCacheInvalidated(this ILogger logger);
+
+    [LoggerMessage(EventId = LogEventIds.WeatherForecastController.EmailReportQueued, Level = LogLevel.Information,
+        Message = "Weather email report queued as job {JobId}")]
+    public static partial void EmailReportQueued(this ILogger logger, string jobId);
+
+    // WeatherReportJob
+    [LoggerMessage(EventId = LogEventIds.WeatherReportJob.ReportJobStarted, Level = LogLevel.Information,
+        Message = "Weather report job started")]
+    public static partial void ReportJobStarted(this ILogger logger);
+
+    [LoggerMessage(EventId = LogEventIds.WeatherReportJob.ReportSent, Level = LogLevel.Information,
+        Message = "Weather report sent with {ForecastCount} forecasts ({PdfSizeBytes} byte PDF)")]
+    public static partial void ReportSent(this ILogger logger, int forecastCount, int pdfSizeBytes);
+
+    // SmtpEmailSender
+    [LoggerMessage(EventId = LogEventIds.SmtpEmailSender.EmailSent, Level = LogLevel.Information,
+        Message = "Email sent: {Subject}")]
+    public static partial void EmailSent(this ILogger logger, string subject);
+
+    [LoggerMessage(EventId = LogEventIds.SmtpEmailSender.EmailSendFailed, Level = LogLevel.Warning,
+        Message = "Email send failed: {Subject}")]
+    public static partial void EmailSendFailed(this ILogger logger, Exception exception, string subject);
 }

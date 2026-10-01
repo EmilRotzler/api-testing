@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hangfire login</title>
+  <style>
+    body { font-family: system-ui, sans-serif; display: grid; place-items: center; min-height: 100vh; margin: 0; }
+    form { display: grid; gap: 8px; width: 240px; }
+    #error { color: #c00; min-height: 1.2em; margin: 0; }
+  </style>
+</head>
+<body>
+  <form id="login">
+    <h1>Hangfire</h1>
+    <small>Admin account required</small>
+    <input name="username" placeholder="Username" autocomplete="username" required autofocus>
+    <input name="password" type="password" placeholder="Password" autocomplete="current-password" required>
+    <button>Log in</button>
+    <p id="error"></p>
+  </form>
+  <script>
+    document.getElementById('login').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = new FormData(e.target);
+      const res = await fetch('/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: form.get('username'), password: form.get('password') }),
+      });
+      if (res.ok) {
+        location.href = '/hangfire';
+      } else {
+        document.getElementById('error').textContent =
+          res.status === 429 ? 'Too many attempts, try again in a minute' : 'Invalid username or password';
+      }
+    });
+  </script>
+</body>
+</html>
