@@ -71,6 +71,9 @@ nunit-*.xml
 # Docs
 /docs
 
+# Claude Code
+CLAUDE.md
+
 # SQLite
 *.db
 *.db-shm

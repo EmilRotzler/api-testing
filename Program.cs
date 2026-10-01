@@ -1,8 +1,8 @@
-using ApiTesting.Data;
-using ApiTesting.Interfaces;
-using ApiTesting.Managers;
-using ApiTesting.Middleware;
-using ApiTesting.Services;
+using ApiTesting.Api.Middleware;
+using ApiTesting.Core.Interfaces;
+using ApiTesting.Core.Managers;
+using ApiTesting.Infrastructure.Data;
+using ApiTesting.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using System.Threading.RateLimiting;
 
