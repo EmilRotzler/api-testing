@@ -1,19 +1,21 @@
 using System.Security.Cryptography;
-using ApiTesting.Api.Dtos;
+using ApiTesting.Common.Configuration;
 using ApiTesting.Common.Logging;
 using ApiTesting.Core.Interfaces;
 using ApiTesting.Core.Models;
 using ApiTesting.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace ApiTesting.Core.Managers;
 
 public class AuthManager(
     AppDbContext dbContext,
     IPasswordHasher passwordHasher,
-    IConfiguration configuration,
+    IOptions<AuthOptions> options,
+    TimeProvider timeProvider,
     ILogger<AuthManager> logger)
-    : IAuthManager
+    : ILoginManager, ITokenValidator
 {
     public async Task<LoginResult?> LoginAsync(string username, string password)
     {
@@ -36,8 +38,8 @@ public class AuthManager(
             return null;
         }
 
-        var now = DateTime.UtcNow;
-        var expiresAt = now.AddHours(configuration.GetValue("Auth:TokenLifetimeHours", 24));
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var expiresAt = now.AddHours(options.Value.TokenLifetimeHours);
         var token = GenerateToken();
 
         dbContext.AuthTokens.Add(new AuthToken
@@ -55,11 +57,6 @@ public class AuthManager(
 
         logger.LoginSucceeded(user.Id, expiresAt);
         return new LoginResult(token, expiresAt);
-    }
-
-    public async Task<bool> ValidateTokenAsync(string token)
-    {
-        return await FindValidTokenAsync(token) is not null;
     }
 
     public async Task<User?> GetUserByTokenAsync(string token)
@@ -89,7 +86,7 @@ public class AuthManager(
             return null;
         }
 
-        if (authToken.ExpiresAt <= DateTime.UtcNow)
+        if (authToken.ExpiresAt <= timeProvider.GetUtcNow().UtcDateTime)
         {
             logger.TokenExpired(authToken.UserId, authToken.ExpiresAt);
             return null;

@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 
 namespace ApiTesting.Api.Middleware;
 
-public class TokenAuthMiddleware(IAuthManager authManager, ILogger<TokenAuthMiddleware> logger) : IMiddleware
+public class TokenAuthMiddleware(ITokenValidator tokenValidator, ILogger<TokenAuthMiddleware> logger) : IMiddleware
 {
     public async Task InvokeAsync(HttpContext context, RequestDelegate next)
     {
@@ -24,7 +24,7 @@ public class TokenAuthMiddleware(IAuthManager authManager, ILogger<TokenAuthMidd
             return;
         }
 
-        if (!await authManager.ValidateTokenAsync(token))
+        if (await tokenValidator.GetUserByTokenAsync(token) is null)
         {
             logger.RequestRejectedInvalidToken(context.Request.Method, context.Request.Path, ipAddress);
             await WriteUnauthorized(context);

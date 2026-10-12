@@ -1,12 +1,10 @@
 using ApiTesting.Core.Interfaces;
-using ApiTesting.Core.Jobs;
 using ApiTesting.Core.Models;
 using ApiTesting.Infrastructure.Data;
-using Hangfire;
 
 namespace ApiTesting.Core.Managers;
 
-public class WeatherForecastManager(ICacheService cache, AppDbContext dbContext, IBackgroundJobClient backgroundJobClient)
+public class WeatherForecastManager(ICacheService cache, AppDbContext dbContext, IReportScheduler reportScheduler)
     : IWeatherForecastManager
 {
     private const string ForecastCacheKey = "weatherforecast";
@@ -25,7 +23,6 @@ public class WeatherForecastManager(ICacheService cache, AppDbContext dbContext,
 
     public string QueueEmailReport()
     {
-        // Hangfire swaps CancellationToken.None for its own shutdown token when the job runs.
-        return backgroundJobClient.Enqueue<WeatherReportJob>(job => job.RunAsync(CancellationToken.None));
+        return reportScheduler.QueueWeatherReport();
     }
 }

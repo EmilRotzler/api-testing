@@ -1,4 +1,3 @@
-using ApiTesting.Api.Dtos;
 using ApiTesting.Api.Middleware;
 using ApiTesting.Common.Constants;
 using ApiTesting.Common.Logging;
@@ -14,16 +13,11 @@ namespace ApiTesting.Tests.Api.Middleware;
 
 public class TokenAuthMiddlewareTests
 {
-    private sealed class FakeAuthManager : IAuthManager
+    private sealed class FakeTokenValidator : ITokenValidator
     {
-        public bool TokenIsValid { get; set; }
+        public User? User { get; set; }
 
-        public Task<LoginResult?> LoginAsync(string username, string password) =>
-            throw new NotImplementedException();
-
-        public Task<bool> ValidateTokenAsync(string token) => Task.FromResult(TokenIsValid);
-
-        public Task<User?> GetUserByTokenAsync(string token) => throw new NotImplementedException();
+        public Task<User?> GetUserByTokenAsync(string token) => Task.FromResult(User);
     }
 
     private static DefaultHttpContext CreateContext(bool allowAnonymous, string? cookieToken = null)
@@ -46,7 +40,7 @@ public class TokenAuthMiddlewareTests
     [Fact]
     public async Task InvokeAsync_CallsNextForAllowAnonymousEndpoint()
     {
-        var middleware = new TokenAuthMiddleware(new FakeAuthManager(), new FakeLogger<TokenAuthMiddleware>());
+        var middleware = new TokenAuthMiddleware(new FakeTokenValidator(),new FakeLogger<TokenAuthMiddleware>());
         var context = CreateContext(allowAnonymous: true);
         var nextCalled = false;
 
@@ -64,7 +58,7 @@ public class TokenAuthMiddlewareTests
     public async Task InvokeAsync_ReturnsUnauthorizedWhenCookieMissing()
     {
         var logger = new FakeLogger<TokenAuthMiddleware>();
-        var middleware = new TokenAuthMiddleware(new FakeAuthManager(), logger);
+        var middleware = new TokenAuthMiddleware(new FakeTokenValidator(),logger);
         var context = CreateContext(allowAnonymous: false);
         context.Request.Method = "POST";
         context.Request.Path = "/weatherforecast/invalidate-cache";
@@ -88,9 +82,9 @@ public class TokenAuthMiddlewareTests
     [Fact]
     public async Task InvokeAsync_ReturnsUnauthorizedWhenTokenInvalid()
     {
-        var authManager = new FakeAuthManager { TokenIsValid = false };
+        var tokenValidator = new FakeTokenValidator { User = null };
         var logger = new FakeLogger<TokenAuthMiddleware>();
-        var middleware = new TokenAuthMiddleware(authManager, logger);
+        var middleware = new TokenAuthMiddleware(tokenValidator, logger);
         var context = CreateContext(allowAnonymous: false, cookieToken: "bad-token");
         var nextCalled = false;
 
@@ -112,9 +106,9 @@ public class TokenAuthMiddlewareTests
     [Fact]
     public async Task InvokeAsync_CallsNextWhenTokenValid()
     {
-        var authManager = new FakeAuthManager { TokenIsValid = true };
+        var tokenValidator = new FakeTokenValidator { User = new User { Id = 1, Username = "someone" } };
         var logger = new FakeLogger<TokenAuthMiddleware>();
-        var middleware = new TokenAuthMiddleware(authManager, logger);
+        var middleware = new TokenAuthMiddleware(tokenValidator, logger);
         var context = CreateContext(allowAnonymous: false, cookieToken: "good-token");
         var nextCalled = false;
 

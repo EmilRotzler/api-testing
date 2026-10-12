@@ -10,7 +10,7 @@ namespace ApiTesting.Api.Controllers;
 
 [ApiController]
 [Route("auth")]
-public class AuthController(IAuthManager authManager, ILogger<AuthController> logger) : ControllerBase
+public class AuthController(ILoginManager loginManager, ILogger<AuthController> logger) : ControllerBase
 {
     [HttpPost("login")]
     [AllowAnonymous]
@@ -18,7 +18,7 @@ public class AuthController(IAuthManager authManager, ILogger<AuthController> lo
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
         var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-        var result = await authManager.LoginAsync(request.Username, request.Password);
+        var result = await loginManager.LoginAsync(request.Username, request.Password);
 
         if (result is null)
         {

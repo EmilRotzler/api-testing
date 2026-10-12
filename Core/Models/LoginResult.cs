@@ -1,3 +1,3 @@
-namespace ApiTesting.Api.Dtos;
+namespace ApiTesting.Core.Models;
 
 public record LoginResult(string Token, DateTime ExpiresAt);

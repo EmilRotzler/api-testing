@@ -27,7 +27,14 @@ builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<ICacheService, MemoryCacheService>();
 builder.Services.AddScoped<IWeatherForecastManager, WeatherForecastManager>();
 builder.Services.AddSingleton<IPasswordHasher, Argon2PasswordHasher>();
-builder.Services.AddScoped<IAuthManager, AuthManager>();
+builder.Services.AddOptions<AuthOptions>()
+    .Bind(builder.Configuration.GetSection(AuthOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+// One scoped AuthManager serves both narrow interfaces.
+builder.Services.AddScoped<AuthManager>();
+builder.Services.AddScoped<ILoginManager>(sp => sp.GetRequiredService<AuthManager>());
+builder.Services.AddScoped<ITokenValidator>(sp => sp.GetRequiredService<AuthManager>());
 
 // QuestPDF Community license: free for individuals and organisations under USD 1M annual revenue.
 QuestPDF.Settings.License = LicenseType.Community;
@@ -46,6 +53,7 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
 builder.Services.AddSingleton<IWeatherReportPdfGenerator, QuestPdfWeatherReportGenerator>();
 builder.Services.AddScoped<WeatherReportJob>();
+builder.Services.AddSingleton<IReportScheduler, HangfireReportScheduler>();
 
 // Hangfire keeps its own tables in a separate SQLite file so they stay out of the EF migrations.
 builder.Services.AddHangfire(config => config

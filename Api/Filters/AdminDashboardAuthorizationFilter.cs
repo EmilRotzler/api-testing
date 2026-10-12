@@ -27,8 +27,8 @@ public class AdminDashboardAuthorizationFilter : IDashboardAsyncAuthorizationFil
             return false;
         }
 
-        var authManager = httpContext.RequestServices.GetRequiredService<IAuthManager>();
-        var user = await authManager.GetUserByTokenAsync(token);
+        var tokenValidator = httpContext.RequestServices.GetRequiredService<ITokenValidator>();
+        var user = await tokenValidator.GetUserByTokenAsync(token);
         if (user is null)
         {
             logger.DashboardAccessDenied("InvalidToken");

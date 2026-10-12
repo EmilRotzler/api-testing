@@ -1,4 +1,3 @@
-using ApiTesting.Api.Dtos;
 using ApiTesting.Api.Filters;
 using ApiTesting.Common.Constants;
 using ApiTesting.Common.Logging;
@@ -14,27 +13,22 @@ namespace ApiTesting.Tests.Api.Filters;
 
 public class AdminDashboardAuthorizationFilterTests
 {
-    private sealed class FakeAuthManager : IAuthManager
+    private sealed class FakeTokenValidator : ITokenValidator
     {
         public Dictionary<string, User> UsersByToken { get; } = [];
-
-        public Task<LoginResult?> LoginAsync(string username, string password) =>
-            throw new NotImplementedException();
-
-        public Task<bool> ValidateTokenAsync(string token) => throw new NotImplementedException();
 
         public Task<User?> GetUserByTokenAsync(string token) =>
             Task.FromResult(UsersByToken.GetValueOrDefault(token));
     }
 
     private static DefaultHttpContext CreateContext(
-        FakeAuthManager authManager,
+        FakeTokenValidator tokenValidator,
         FakeLogger<AdminDashboardAuthorizationFilter> logger,
         string? cookieToken
     )
     {
         var services = new ServiceCollection()
-            .AddSingleton<IAuthManager>(authManager)
+            .AddSingleton<ITokenValidator>(tokenValidator)
             .AddSingleton<ILogger<AdminDashboardAuthorizationFilter>>(logger)
             .BuildServiceProvider();
 
@@ -61,12 +55,12 @@ public class AdminDashboardAuthorizationFilterTests
     [Fact]
     public async Task IsAuthorizedAsync_AllowsAdmin()
     {
-        var authManager = new FakeAuthManager();
-        authManager.UsersByToken["admin-token"] = CreateUser(AuthConstants.AdminRole);
+        var tokenValidator = new FakeTokenValidator();
+        tokenValidator.UsersByToken["admin-token"] = CreateUser(AuthConstants.AdminRole);
         var logger = new FakeLogger<AdminDashboardAuthorizationFilter>();
 
         var allowed = await new AdminDashboardAuthorizationFilter().IsAuthorizedAsync(
-            CreateContext(authManager, logger, "admin-token")
+            CreateContext(tokenValidator, logger, "admin-token")
         );
 
         Assert.True(allowed);
@@ -76,12 +70,12 @@ public class AdminDashboardAuthorizationFilterTests
     [Fact]
     public async Task IsAuthorizedAsync_DeniesNonAdmin()
     {
-        var authManager = new FakeAuthManager();
-        authManager.UsersByToken["user-token"] = CreateUser("User");
+        var tokenValidator = new FakeTokenValidator();
+        tokenValidator.UsersByToken["user-token"] = CreateUser("User");
         var logger = new FakeLogger<AdminDashboardAuthorizationFilter>();
 
         var allowed = await new AdminDashboardAuthorizationFilter().IsAuthorizedAsync(
-            CreateContext(authManager, logger, "user-token")
+            CreateContext(tokenValidator, logger, "user-token")
         );
 
         Assert.False(allowed);
@@ -101,7 +95,7 @@ public class AdminDashboardAuthorizationFilterTests
         var logger = new FakeLogger<AdminDashboardAuthorizationFilter>();
 
         var allowed = await new AdminDashboardAuthorizationFilter().IsAuthorizedAsync(
-            CreateContext(new FakeAuthManager(), logger, cookieToken: null)
+            CreateContext(new FakeTokenValidator(), logger, cookieToken: null)
         );
 
         Assert.False(allowed);
@@ -119,7 +113,7 @@ public class AdminDashboardAuthorizationFilterTests
         var logger = new FakeLogger<AdminDashboardAuthorizationFilter>();
 
         var allowed = await new AdminDashboardAuthorizationFilter().IsAuthorizedAsync(
-            CreateContext(new FakeAuthManager(), logger, "bad-token")
+            CreateContext(new FakeTokenValidator(), logger, "bad-token")
         );
 
         Assert.False(allowed);

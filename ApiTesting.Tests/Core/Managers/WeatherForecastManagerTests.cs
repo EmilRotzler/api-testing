@@ -1,10 +1,6 @@
 using ApiTesting.Core.Interfaces;
-using ApiTesting.Core.Jobs;
 using ApiTesting.Core.Managers;
 using ApiTesting.Infrastructure.Data;
-using Hangfire;
-using Hangfire.Common;
-using Hangfire.States;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -19,18 +15,15 @@ public class WeatherForecastManagerTests
         public void Invalidate(string key) { }
     }
 
-    private sealed class FakeBackgroundJobClient : IBackgroundJobClient
+    private sealed class FakeReportScheduler : IReportScheduler
     {
-        public List<(Job Job, IState State)> Created { get; } = [];
+        public int QueuedCount { get; private set; }
 
-        public string Create(Job job, IState state)
+        public string QueueWeatherReport()
         {
-            Created.Add((job, state));
+            QueuedCount++;
             return "job-42";
         }
-
-        public bool ChangeState(string jobId, IState state, string expectedState) =>
-            throw new NotImplementedException();
     }
 
     private static AppDbContext CreateDbContext()
@@ -42,18 +35,15 @@ public class WeatherForecastManagerTests
     }
 
     [Fact]
-    public async Task QueueEmailReport_EnqueuesWeatherReportJobAndReturnsJobId()
+    public async Task QueueEmailReport_QueuesWeatherReportAndReturnsJobId()
     {
         await using var dbContext = CreateDbContext();
-        var jobClient = new FakeBackgroundJobClient();
-        var manager = new WeatherForecastManager(new FakeCacheService(), dbContext, jobClient);
+        var scheduler = new FakeReportScheduler();
+        var manager = new WeatherForecastManager(new FakeCacheService(), dbContext, scheduler);
 
         var jobId = manager.QueueEmailReport();
 
         Assert.Equal("job-42", jobId);
-        var (job, state) = Assert.Single(jobClient.Created);
-        Assert.Equal(typeof(WeatherReportJob), job.Type);
-        Assert.Equal(nameof(WeatherReportJob.RunAsync), job.Method.Name);
-        Assert.IsType<EnqueuedState>(state);
+        Assert.Equal(1, scheduler.QueuedCount);
     }
 }
